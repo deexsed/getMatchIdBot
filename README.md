@@ -38,12 +38,18 @@
    - Дождитесь окончания установки всех пакетов.
 
 2. **Настройте файл `heroes.json`**:
-   - В файле `heroes.json` укажите необходимых героев. Они будут отображаться у пользователя при вводе героя. В названии можно указать что угодно.
-     ![image](https://github.com/user-attachments/assets/2840598b-7da7-4b04-b0fc-d476ba43d987)
+   - В файле `heroes.json` укажите необходимых героев.
+![image](https://github.com/user-attachments/assets/49df6383-2c11-4c30-b489-059aa66cc1c0)
+
+   - Они будут отображаться у пользователя при вводе героя. В названии можно указать что угодно.
+
+![image](https://github.com/user-attachments/assets/2840598b-7da7-4b04-b0fc-d476ba43d987)
 
 
 3. **Настройте файл `config.py`**:
    - В файле `config.py` укажите токен бота, полученный от @BotFather.
+![image](https://github.com/user-attachments/assets/aa5a1b9e-e31c-428c-9d4a-1d46e1bed491)
+
 
 4. **Запустите бота**:
    - Запустите файл `start_bot.bat` для начала работы бота.
