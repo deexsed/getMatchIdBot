@@ -39,6 +39,8 @@
 
 2. **Настройте файл `heroes.json`**:
    - В файле `heroes.json` укажите необходимых героев. Они будут отображаться у пользователя при вводе героя. В названии можно указать что угодно.
+     ![image](https://github.com/user-attachments/assets/2840598b-7da7-4b04-b0fc-d476ba43d987)
+
 
 3. **Настройте файл `config.py`**:
    - В файле `config.py` укажите токен бота, полученный от @BotFather.
@@ -58,6 +60,7 @@
 
 ```bash
 pip uninstall -y -r requirements.txt
+```
 
 ---
 
