@@ -38,17 +38,28 @@
    - Дождитесь окончания установки всех пакетов.
 
 2. **Настройте файл `heroes.json`**:
-   - В файле `heroes.json` укажите необходимых героев.
-![image](https://github.com/user-attachments/assets/49df6383-2c11-4c30-b489-059aa66cc1c0)
+   - В файле `heroes.json` укажите необходимых героев. Они будут отображаться у пользователя при вводе героя. В названии можно указать что угодно.
 
-   - Они будут отображаться у пользователя при вводе героя. В названии можно указать что угодно.
-![image](https://github.com/user-attachments/assets/2840598b-7da7-4b04-b0fc-d476ba43d987)
+   <div align="center">
+     <img src="https://github.com/user-attachments/assets/49df6383-2c11-4c30-b489-059aa66cc1c0" alt="Пример heroes.json" width="500">
+     <br>
+     <em>Пример содержимого файла heroes.json</em>
+   </div>
 
+   <div align="center">
+     <img src="https://github.com/user-attachments/assets/2840598b-7da7-4b04-b0fc-d476ba43d987" alt="Пример отображения героев" width="500">
+     <br>
+     <em>Пример отображения героев у пользователя</em>
+   </div>
 
 3. **Настройте файл `config.py`**:
    - В файле `config.py` укажите токен бота, полученный от @BotFather.
-![image](https://github.com/user-attachments/assets/aa5a1b9e-e31c-428c-9d4a-1d46e1bed491)
 
+   <div align="center">
+     <img src="https://github.com/user-attachments/assets/aa5a1b9e-e31c-428c-9d4a-1d46e1bed491" alt="Пример config.py" width="500">
+     <br>
+     <em>Пример содержимого файла config.py</em>
+   </div>
 
 4. **Запустите бота**:
    - Запустите файл `start_bot.bat` для начала работы бота.
@@ -65,8 +76,3 @@
 
 ```bash
 pip uninstall -y -r requirements.txt
-```
-
----
-
-**Примечание**: Убедитесь, что все шаги выполнены корректно, чтобы бот работал без ошибок. Если возникнут проблемы, проверьте, правильно ли вы указали токен и установили все необходимые библиотеки.
