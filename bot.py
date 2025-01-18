@@ -6,6 +6,7 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Border, Side
 import telegram.ext.filters as filters
 from config import TG_BOT_TOKEN
+from datetime import datetime
 
 # Функция для загрузки списка героев из JSON-файла
 def load_heroes(filename='heroes.json'):
@@ -36,14 +37,14 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         
         match_number = update.message.text.strip()
 
-        if match_number.isdigit():
+        if match_number.isdigit() or (len(match_number) >= 8 or len(match_number) <= 16):
             context.user_data['match_number'] = match_number
             await send_hero_selection(update)  # Отправляем клавиатуру с героями
             context.user_data['waiting_for_hero'] = True
             context.user_data['nickname'] = nickname
             context.user_data['waiting_for_match_number'] = False
         else:
-            await update.message.reply_text('Пожалуйста, введите корректный номер матча (только цифры).')
+            await update.message.reply_text('Пожалуйста, введите корректный номер матча (только цифры, длина от 8 до 16 символов включительно).')
 
 async def send_hero_selection(update: Update) -> None:
     # Разбиваем список героев на строки по 2 кнопки
@@ -135,6 +136,10 @@ def save_data(match_number, nickname, hero_name):
                              bottom=Side(style='thin'))
 
     workbook.save("matchStat.xlsx")
+
+      # Выводим информацию о добавленной записи в консоль
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"{current_time} - Добавлена запись: {nickname}, {match_number}, {hero_name}")
 
 def main() -> None:
     print("Бот успешно запущен!\n")
