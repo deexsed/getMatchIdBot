@@ -42,7 +42,6 @@
 ![image](https://github.com/user-attachments/assets/49df6383-2c11-4c30-b489-059aa66cc1c0)
 
    - Они будут отображаться у пользователя при вводе героя. В названии можно указать что угодно.
-
 ![image](https://github.com/user-attachments/assets/2840598b-7da7-4b04-b0fc-d476ba43d987)
 
 
