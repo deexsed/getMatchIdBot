@@ -22,29 +22,29 @@ def create_excel_file():
     workbook = Workbook()
     sheet = workbook.active
     sheet.title = "Match Data"
-    sheet.append(["Nickname", "Match Number", "Hero"])  # Добавляем заголовок для героя
+    sheet.append(["Date", "Nickname", "Match ID", "Hero", "Outcome"])  # Добавляем столбец "Дата"
     workbook.save("matchStat.xlsx")
 
 # Обработчик команды /start для бота
 async def start(update: Update, context: CallbackContext) -> None:
-    await update.message.reply_text('Введите номер матча:')
-    context.user_data['waiting_for_match_number'] = True
+    await update.message.reply_text('Введите ID матча:')
+    context.user_data['waiting_for_match_id'] = True
 
 # Обработчик сообщений для обработки ввода пользователя
 async def handle_message(update: Update, context: CallbackContext) -> None:
-    if context.user_data.get('waiting_for_match_number'):
+    if context.user_data.get('waiting_for_match_id'):
         nickname = f"@{update.message.from_user.username}" if update.message.from_user.username else update.message.from_user.first_name
         
-        match_number = update.message.text.strip()
+        match_id = update.message.text.strip()
 
-        if match_number.isdigit() or (len(match_number) >= 8 or len(match_number) <= 16):
-            context.user_data['match_number'] = match_number
+        if match_id.isdigit() or (len(match_id) >= 8 or len(match_id) <= 16):
+            context.user_data['match_id'] = match_id
             await send_hero_selection(update)  # Отправляем клавиатуру с героями
             context.user_data['waiting_for_hero'] = True
             context.user_data['nickname'] = nickname
-            context.user_data['waiting_for_match_number'] = False
+            context.user_data['waiting_for_match_id'] = False
         else:
-            await update.message.reply_text('Пожалуйста, введите корректный номер матча (только цифры, длина от 8 до 16 символов включительно).')
+            await update.message.reply_text('Пожалуйста, введите корректный ID матча (только цифры, длина от 8 до 16 символов включительно).')
 
 async def send_hero_selection(update: Update) -> None:
     # Разбиваем список героев на строки по 2 кнопки
@@ -56,18 +56,27 @@ async def send_hero_selection(update: Update) -> None:
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text('Выберите имя героя, на котором вы играли:', reply_markup=reply_markup)
 
+async def send_match_outcome_selection(message) -> None:
+    keyboard = [
+        [InlineKeyboardButton("Победа", callback_data='win')],
+        [InlineKeyboardButton("Поражение", callback_data='lose')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await message.reply_text('Выберите исход матча:', reply_markup=reply_markup)
+
 async def handle_hero_selection(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()  # Подтверждаем нажатие кнопки
 
+    # Проверяем, что callback_data соответствует герою
+    if query.data not in HEROES:
+        return  # Игнорируем, если это не выбор героя
+
     # Проверяем наличие необходимых данных
-    match_number = context.user_data.get('match_number')
+    match_id = context.user_data.get('match_id')
     nickname = context.user_data.get('nickname')
 
-    if match_number is None or nickname is None:
-        query = update.callback_query
-        await query.answer()  # Подтверждаем нажатие кнопки
-
+    if match_id is None or nickname is None:
         # Создаем новый объект Update для передачи в функцию start
         new_update = Update(update_id=query.id, message=query.message)
         
@@ -75,13 +84,37 @@ async def handle_hero_selection(update: Update, context: CallbackContext) -> Non
         return
 
     hero_name = query.data  # Получаем имя героя из callback_data
-    save_data(match_number, nickname, hero_name)
+    context.user_data['hero_name'] = hero_name
+
+    await send_match_outcome_selection(query.message)  # Отправляем кнопки для выбора исхода матча
+
+
+async def handle_match_outcome(update: Update, context: CallbackContext) -> None:
+    query = update.callback_query
+    await query.answer()  # Подтверждаем нажатие кнопки
+
+    # Проверяем, что callback_data соответствует исходу матча
+    if query.data not in ['win', 'lose']:
+        return  # Игнорируем, если это не выбор исхода
+
+    match_outcome = query.data  # Получаем исход матча из callback_data
+    match_id = context.user_data.get('match_id')
+    nickname = context.user_data.get('nickname')
+    hero_name = context.user_data.get('hero_name')
+
+    if match_id is None or nickname is None or hero_name is None:
+        # Создаем новый объект Update для передачи в функцию start
+        new_update = Update(update_id=query.id, message=query.message)
+        
+        await start(new_update, context)  # Запускаем процесс записи заново
+        return
+
+    save_data(match_id, nickname, hero_name, match_outcome)
 
     await query.message.reply_text('Данные сохранены!')
     await send_restart_button(query.message)  # Отправляем кнопку для начала нового ввода
     
     context.user_data.clear()
-
 
 async def send_restart_button(update: Update) -> None:
     keyboard = [
@@ -99,7 +132,7 @@ async def handle_restart(update: Update, context: CallbackContext) -> None:
     
     await start(new_update, context)  # Запускаем процесс записи заново
 
-def save_data(match_number, nickname, hero_name):
+def save_data(match_id, nickname, hero_name, match_outcome):
     try:
         workbook = load_workbook("matchStat.xlsx")
         sheet = workbook.active
@@ -116,7 +149,11 @@ def save_data(match_number, nickname, hero_name):
             cell.font = header_font
             cell.fill = header_fill
 
-    new_row = [nickname, match_number, hero_name]
+    # Получаем текущую дату и время
+    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    # Добавляем новую строку с датой
+    new_row = [current_time, nickname, match_id, hero_name, match_outcome]
     sheet.append(new_row)
 
     # Определяем цвет для текущей строки
@@ -127,7 +164,7 @@ def save_data(match_number, nickname, hero_name):
         fill_color = PatternFill(start_color="e6f3fb", end_color="e6f3fb", fill_type="solid")  # Полупрозрачный синий
 
     # Применяем цвет к ячейкам новой строки
-    for col in range(1, 4):  # Предполагаем, что у нас 3 колонки
+    for col in range(1, 6):  # Теперь у нас 5 колонок
         cell = sheet.cell(row=current_row, column=col)
         cell.fill = fill_color
         cell.border = Border(left=Side(style='thin'), 
@@ -135,11 +172,17 @@ def save_data(match_number, nickname, hero_name):
                              top=Side(style='thin'), 
                              bottom=Side(style='thin'))
 
+    # Изменяем цвет шрифта в зависимости от исхода матча
+    outcome_cell = sheet.cell(row=current_row, column=5)  # Столбец "Outcome" теперь 5-й
+    if match_outcome == 'win':
+        outcome_cell.font = Font(color="00FF00")  # Зеленый цвет для победы
+    else:
+        outcome_cell.font = Font(color="FF0000")  # Красный цвет для поражения
+
     workbook.save("matchStat.xlsx")
 
-      # Выводим информацию о добавленной записи в консоль
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"{current_time} - Добавлена запись: {nickname}, {match_number}, {hero_name}")
+    # Выводим информацию о добавленной записи в консоль
+    print(f"{current_time} - Добавлена запись: {nickname}, {match_id}, {hero_name}, {match_outcome}")
 
 def main() -> None:
     print("Бот успешно запущен!\n")
@@ -148,9 +191,14 @@ def main() -> None:
     application.add_handler(CommandHandler('start', start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # Обработчик для кнопок выбора героев и перезапуска записи матчей
-    application.add_handler(CallbackQueryHandler(handle_hero_selection))  
-    application.add_handler(CallbackQueryHandler(handle_restart))
+    # Обработчик для кнопок выбора героев
+    application.add_handler(CallbackQueryHandler(handle_hero_selection, pattern='^(' + '|'.join(HEROES) + ')$'))
+    
+    # Обработчик для кнопок выбора исхода матча
+    application.add_handler(CallbackQueryHandler(handle_match_outcome, pattern='^(win|lose)$'))
+    
+    # Обработчик для кнопки перезапуска
+    application.add_handler(CallbackQueryHandler(handle_restart, pattern='^restart$'))
 
     application.run_polling()
 
