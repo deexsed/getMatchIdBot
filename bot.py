@@ -1,11 +1,11 @@
 import json
 import pandas as pd
+import config
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackContext, CallbackQueryHandler
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Border, Side
 import telegram.ext.filters as filters
-from config import TG_BOT_TOKEN
 from datetime import datetime
 
 # Функция для загрузки списка героев из JSON-файла
@@ -181,12 +181,12 @@ def save_data(match_id, nickname, hero_name, match_outcome):
 
     workbook.save("matchStat.xlsx")
 
-    # Выводим информацию о добавленной записи в консоль
-    print(f"{current_time} - Добавлена запись: {nickname}, {match_id}, {hero_name}, {match_outcome}")
+    if config.PRINT_TO_CONSOLE:
+        print(f"{current_time} - Добавлена запись: {nickname}, {match_id}, {hero_name}, {match_outcome}")
 
 def main() -> None:
     print("Бот успешно запущен!\n")
-    application = ApplicationBuilder().token(TG_BOT_TOKEN).build()
+    application = ApplicationBuilder().token(config.TG_BOT_TOKEN).build()
 
     application.add_handler(CommandHandler('start', start))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
