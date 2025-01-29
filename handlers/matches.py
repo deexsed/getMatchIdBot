@@ -17,8 +17,7 @@ import json
 
 logger = logging.getLogger(__name__)
 
-@handle_errors
-async def new_game(update: Update, context: CallbackContext) -> None:
+async def start_new_game(update: Update, context: CallbackContext) -> None:
     """Начинает процесс записи нового матча"""
     context.user_data.clear()
     await update.message.reply_text('Введите ID матча:')
@@ -152,7 +151,7 @@ async def handle_hero_selection(update: Update, context: CallbackContext) -> Non
         nickname = context.user_data.get('nickname')
 
         if match_id is None or nickname is None:
-            await start(update, context)
+            await start_new_game(update, context)
             return
 
         context.user_data['hero_name'] = hero_name
@@ -179,7 +178,7 @@ async def handle_match_outcome(update: Update, context: CallbackContext) -> None
     hero_name = context.user_data.get('hero_name')
 
     if match_id is None or nickname is None or hero_name is None:
-        await start(update, context)
+        await start_new_game(update, context)
         return
 
     try:

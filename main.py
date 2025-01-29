@@ -12,7 +12,7 @@ import config
 from database.connection import init_db
 from handlers.base import start_command, cancel_command, error_handler
 from handlers.matches import (
-    new_game, handle_message, handle_hero_selection,
+    start_new_game, handle_message, handle_hero_selection,
     handle_match_outcome, handle_restart, last_matches
 )
 from handlers.stats import stats_handler, period_stats_handler, handle_period_stats, mmr_command, set_mmr_command
@@ -78,7 +78,7 @@ def main():
             application.add_handler(CommandHandler('cancel', cancel_command))
             
             # Обработчики сообщений и callback'ов
-            application.add_handler(CommandHandler('newgame', new_game))
+            application.add_handler(CommandHandler('newgame', start_new_game))
             application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
             application.add_handler(CallbackQueryHandler(handle_hero_selection, pattern='^(hero:|page:|search|cancel_search)'))
             application.add_handler(CallbackQueryHandler(handle_match_outcome, pattern='^(win|lose)$'))
