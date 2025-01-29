@@ -1,11 +1,32 @@
+"""
+Сервис для работы с героями
+"""
 from database.connection import get_db
 from database.models import get_or_create_user
-import json
 import logging
-import os
 from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
+
+def get_all_heroes():
+    """Получает список всех героев из базы данных"""
+    with get_db() as db:
+        heroes = db.execute('SELECT name, localized_name FROM heroes ORDER BY localized_name').fetchall()
+        return [{'name': hero['name'], 'localized_name': hero['localized_name']} for hero in heroes]
+
+def get_hero_by_name(name):
+    """Получает информацию о герое по имени"""
+    with get_db() as db:
+        return db.execute('SELECT * FROM heroes WHERE name = ?', (name,)).fetchone()
+
+def get_heroes_by_attribute(attr):
+    """Получает список героев по основному атрибуту"""
+    with get_db() as db:
+        heroes = db.execute(
+            'SELECT name FROM heroes WHERE primary_attr = ? ORDER BY name',
+            (attr,)
+        ).fetchall()
+        return [hero['name'] for hero in heroes]
 
 def get_hero_prediction(telegram_nickname, hero):
     """Получает расширенный анализ героя"""
@@ -72,87 +93,130 @@ def get_hero_prediction(telegram_nickname, hero):
         
         month_winrate = (month_stats['wins'] / month_stats['games'] * 100) if month_stats['games'] > 0 else 0
         
-        # Определяем тренд
-        trend = 'стабильный'
-        if recent_winrate > total_winrate + 10:
-            trend = 'растущий'
-        elif recent_winrate < total_winrate - 10:
-            trend = 'падающий'
-        
-        # Рассчитываем различные показатели для оценки
+        # Инициализируем метрики производительности
         performance_metrics = {
-            'consistency': 0,  # Стабильность результатов
-            'trend_score': 0,  # Оценка тренда
-            'experience': 0,   # Опыт на герое
-            'recent_performance': 0  # Недавние результаты
+            'consistency': 0,  # Стабильность результатов (1-5)
+            'trend_score': 0,  # Оценка тренда (1-5)
+            'experience': 0,   # Опыт на герое (1-5)
+            'recent_performance': 0  # Недавние результаты (1-5)
         }
         
-        # Оценка стабильности (на основе разброса винрейта)
+        # Обновленная оценка стабильности (1-5)
         winrate_variance = abs(recent_winrate - total_winrate)
-        if winrate_variance <= 5:
-            performance_metrics['consistency'] = 3  # Высокая стабильность
-        elif winrate_variance <= 15:
-            performance_metrics['consistency'] = 2  # Средняя стабильность
-        else:
-            performance_metrics['consistency'] = 1  # Низкая стабильность
-            
-        # Оценка тренда
-        if trend == 'растущий':
-            performance_metrics['trend_score'] = 3
-        elif trend == 'стабильный':
-            performance_metrics['trend_score'] = 2
-        else:
-            performance_metrics['trend_score'] = 1
-            
-        # Оценка опыта
-        if total_games >= 30:
-            performance_metrics['experience'] = 3
-        elif total_games >= 15:
-            performance_metrics['experience'] = 2
-        else:
-            performance_metrics['experience'] = 1
-            
-        # Оценка недавних результатов
-        if month_stats['games'] >= 5:
-            if month_winrate >= 60:
-                performance_metrics['recent_performance'] = 3
-            elif month_winrate >= 50:
-                performance_metrics['recent_performance'] = 2
+        recent_games = len(recent_matches)
+        
+        if recent_games >= 5:
+            if winrate_variance <= 5:
+                if total_winrate >= 55:
+                    performance_metrics['consistency'] = 5  # Отличная стабильность с высоким винрейтом
+                elif total_winrate >= 50:
+                    performance_metrics['consistency'] = 4  # Хорошая стабильность
+                elif total_winrate >= 45:
+                    performance_metrics['consistency'] = 3  # Средняя стабильность
+                else:
+                    performance_metrics['consistency'] = 2  # Стабильно низкие результаты
+            elif winrate_variance <= 10:
+                performance_metrics['consistency'] = 3
+            elif winrate_variance <= 15:
+                performance_metrics['consistency'] = 2
             else:
-                performance_metrics['recent_performance'] = 1
+                performance_metrics['consistency'] = 1
+            
+            # Учитываем текущую серию
+            if current_streak >= 3 and streak_type == 'lose':
+                performance_metrics['consistency'] = max(1, performance_metrics['consistency'] - 2)
+        else:
+            performance_metrics['consistency'] = 1
+            
+        # Улучшенная оценка тренда (1-5)
+        if total_games >= 5:
+            if recent_winrate > total_winrate + 20:
+                performance_metrics['trend_score'] = 5  # Значительный рост
+                trend = 'растущий'
+            elif recent_winrate > total_winrate + 10:
+                performance_metrics['trend_score'] = 4  # Умеренный рост
+                trend = 'растущий'
+            elif recent_winrate > total_winrate + 5:
+                performance_metrics['trend_score'] = 3  # Небольшой рост
+                trend = 'растущий'
+            elif recent_winrate < total_winrate - 15:
+                performance_metrics['trend_score'] = 1  # Сильное падение
+                trend = 'падающий'
+            elif recent_winrate < total_winrate - 5:
+                performance_metrics['trend_score'] = 2  # Умеренное падение
+                trend = 'падающий'
+            else:
+                performance_metrics['trend_score'] = 3  # Стабильный тренд
+                trend = 'стабильный'
+        else:
+            performance_metrics['trend_score'] = 3
+            trend = 'недостаточно данных'
+            
+        # Более точная оценка опыта (1-5)
+        if total_games >= 50:
+            performance_metrics['experience'] = 5  # Эксперт
+        elif total_games >= 30:
+            performance_metrics['experience'] = 4  # Опытный
+        elif total_games >= 20:
+            performance_metrics['experience'] = 3  # Уверенный
+        elif total_games >= 10:
+            performance_metrics['experience'] = 2  # Начинающий
+        else:
+            performance_metrics['experience'] = 1  # Новичок
+            
+        # Улучшенная оценка недавних результатов (1-5)
+        if month_stats['games'] >= 5:
+            if month_winrate >= 70:
+                performance_metrics['recent_performance'] = 5  # Превосходно
+            elif month_winrate >= 60:
+                performance_metrics['recent_performance'] = 4  # Очень хорошо
+            elif month_winrate >= 50:
+                performance_metrics['recent_performance'] = 3  # Хорошо
+            elif month_winrate >= 40:
+                performance_metrics['recent_performance'] = 2  # Удовлетворительно
+            else:
+                performance_metrics['recent_performance'] = 1  # Плохо
+        else:
+            performance_metrics['recent_performance'] = 1
         
-        # Общая оценка производительности (максимум 12 баллов)
+        # Обновленное определение уровня комфорта
         total_score = sum(performance_metrics.values())
+        max_score = 20  # Максимально возможный счет (4 метрики по 5 баллов)
         
-        # Определяем уровень комфорта на основе комплексной оценки
-        comfort_level = 'средний'  # По умолчанию средний
-        
-        if total_score >= 10 and total_winrate >= 55:
+        if total_games < 5:
+            comfort_level = 'недостаточно игр'
+        elif total_score >= max_score * 0.8:  # 16+ баллов
             comfort_level = 'высокий'
-        elif total_score >= 8 and total_winrate >= 50:
+        elif total_score >= max_score * 0.6:  # 12+ баллов
             comfort_level = 'хороший'
-        elif total_games < 10 and total_winrate >= 60:
-            comfort_level = 'перспективный'
-        elif total_score <= 6 and total_games >= 10:
+        elif total_score >= max_score * 0.4:  # 8+ баллов
+            comfort_level = 'средний'
+        else:
             comfort_level = 'низкий'
         
-        # Определяем сильные и слабые стороны
+        # Обновленный анализ сильных и слабых сторон
         strengths = []
         weaknesses = []
         
-        # Анализ стабильности
-        if performance_metrics['consistency'] == 3:
-            strengths.append("Стабильные результаты")
-        elif performance_metrics['consistency'] == 1:
-            weaknesses.append("Нестабильные результаты")
+        # Анализ стабильности только при достаточном количестве игр
+        if recent_games >= 5:
+            if performance_metrics['consistency'] == 5:
+                strengths.append("Отличная стабильность")
+            elif performance_metrics['consistency'] == 4:
+                strengths.append("Хорошая стабильность")
+            elif performance_metrics['consistency'] == 3:
+                strengths.append("Средняя стабильность")
+            elif performance_metrics['consistency'] == 2:
+                weaknesses.append("Стабильно низкие результаты")
         
         # Анализ винрейта с учетом опыта
-        if total_winrate >= 70:
-            strengths.append("Исключительный винрейт")
-        elif total_winrate >= 60:
-            strengths.append("Высокий винрейт")
-        elif total_winrate < 45 and total_games >= 10:
-            weaknesses.append("Низкий винрейт")
+        if total_games >= 10:
+            if total_winrate >= 65:
+                strengths.append("Исключительный винрейт")
+            elif total_winrate >= 55:
+                strengths.append("Хороший винрейт")
+            elif total_winrate < 45:
+                weaknesses.append("Низкий винрейт")
         
         # Анализ серий с контекстом
         if best_streak >= 5:
@@ -271,27 +335,10 @@ def get_user_heroes(telegram_nickname):
         ).fetchall()
         return [h['hero'] for h in heroes]
 
-def load_heroes(filename='data/heroes.json'):
-    """Загружает список героев из JSON файла"""
-    try:
-        # Получаем абсолютный путь к файлу относительно корня проекта
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        file_path = os.path.join(base_dir, filename)
-        
-        with open(file_path, 'r', encoding='utf-8') as file:
-            data = json.load(file)
-            return data['heroes']
-    except FileNotFoundError:
-        logger.error(f"Ошибка: Файл {filename} не найден")
-        return []
-    except json.JSONDecodeError:
-        logger.error(f"Ошибка: Файл {filename} содержит некорректный JSON")
-        return []
-    except KeyError:
-        logger.error(f"Ошибка: В файле {filename} отсутствует ключ 'heroes'")
-        return []
-
-# Загружаем список героев при импорте модуля
-HEROES = load_heroes()
+# Константы для пагинации
 HEROES_PER_PAGE = 21  # Кратно 3 для трех столбцов
-MAX_PAGES = len(HEROES) // HEROES_PER_PAGE + (1 if len(HEROES) % HEROES_PER_PAGE > 0 else 0) 
+
+def get_max_pages():
+    """Получает максимальное количество страниц"""
+    heroes_count = len(get_all_heroes())
+    return (heroes_count + HEROES_PER_PAGE - 1) // HEROES_PER_PAGE 

@@ -22,3 +22,21 @@ def get_or_create_user(telegram_nickname):
         )
         db.commit()
         return cursor.lastrowid 
+
+def get_user_mmr(user_id):
+    """Получает MMR пользователя"""
+    with get_db() as db:
+        result = db.execute(
+            'SELECT mmr FROM users WHERE id = ?',
+            (user_id,)
+        ).fetchone()
+        return result if result else None
+
+def update_user_mmr(user_id, mmr):
+    """Обновляет MMR пользователя"""
+    with get_db() as db:
+        db.execute(
+            'UPDATE users SET mmr = ? WHERE id = ?',
+            (mmr, user_id)
+        )
+        db.commit() 

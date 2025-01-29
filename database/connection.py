@@ -9,11 +9,18 @@ logger = logging.getLogger(__name__)
 
 DATABASE_PATH = 'data/dota_stats.db'
 
+def dict_factory(cursor, row):
+    """Преобразует результаты запроса в словарь"""
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
 def get_db():
     """Создает подключение к базе данных"""
     try:
         db = sqlite3.connect(DATABASE_PATH)
-        db.row_factory = sqlite3.Row
+        db.row_factory = dict_factory
         return db
     except sqlite3.Error as e:
         logger.error(f"Ошибка при подключении к БД: {e}")
@@ -24,15 +31,41 @@ def init_db():
     if not os.path.exists('data'):
         os.makedirs('data')
         
-    with get_db() as db:
-        try:
+    try:
+        with get_db() as db:
             # Создаем таблицу пользователей
             db.execute('''
                 CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    telegram_nickname TEXT UNIQUE NOT NULL,
-                    mmr INTEGER DEFAULT NULL,
-                    last_mmr_update TIMESTAMP DEFAULT NULL
+                    id INTEGER PRIMARY KEY,
+                    telegram_nickname TEXT NOT NULL UNIQUE,
+                    mmr INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            # Создаем таблицу героев
+            db.execute('''
+                CREATE TABLE IF NOT EXISTS heroes (
+                    id INTEGER PRIMARY KEY,
+                    name TEXT NOT NULL UNIQUE,
+                    localized_name TEXT,
+                    primary_attr TEXT,
+                    attack_type TEXT,
+                    roles TEXT,
+                    base_str INTEGER,
+                    base_agi INTEGER,
+                    base_int INTEGER,
+                    str_gain REAL,
+                    agi_gain REAL,
+                    int_gain REAL,
+                    base_health INTEGER,
+                    base_mana INTEGER,
+                    base_armor REAL,
+                    base_attack_min INTEGER,
+                    base_attack_max INTEGER,
+                    base_movement_speed INTEGER,
+                    role_levels TEXT,
+                    complexity INTEGER
                 )
             ''')
             
@@ -102,6 +135,6 @@ def init_db():
             db.commit()
             logger.info("База данных успешно инициализирована")
             
-        except sqlite3.Error as e:
-            logger.error(f"Ошибка при инициализации БД: {e}")
-            raise 
+    except Exception as e:
+        logger.error(f"Ошибка при инициализации БД: {e}")
+        raise 

@@ -37,7 +37,7 @@ def get_hero_prediction_text(hero, prediction):
         f"• Тренд: {'⭐' * prediction['performance_metrics']['trend_score']}\n"
         f"• Опыт: {'⭐' * prediction['performance_metrics']['experience']}\n"
         f"• Текущая форма: {'⭐' * prediction['performance_metrics']['recent_performance']}\n"
-        f"• Общая оценка: {prediction['total_score']}/12\n\n"
+        f"• Общая оценка: {prediction['total_score']}/20\n\n"
     )
     
     # Добавляем информацию о серии
@@ -239,4 +239,40 @@ def get_matches_text(matches):
             f"Исход: {outcome_emoji}\n"
             f"ID матча: {match['match_id']}\n\n"
         )
-    return matches_text 
+    return matches_text
+
+def format_hero_prediction(data):
+    """Форматирует предсказание для героя"""
+    if data['status'] == 'недостаточно данных':
+        return f"⚠️ {data['message']}\nСыграно игр: {data['games']}"
+    
+    # Эмодзи для оценок
+    star_emojis = {
+        1: "⭐",
+        2: "⭐⭐",
+        3: "⭐⭐⭐",
+        4: "⭐⭐⭐⭐",
+        5: "⭐⭐⭐⭐⭐"
+    }
+    
+    metrics = data['performance_metrics']
+    max_score = 20  # Максимально возможный счет (4 метрики по 5 баллов)
+    
+    message = [
+        f"🎯 Анализ героя {data['hero_name']}:",
+        "",
+        "Общая статистика:",
+        f"• Всего игр: {data['games']}",
+        f"• Общий винрейт: {data['winrate']:.1f}%",
+        f"• Недавний винрейт: {data['recent_winrate']:.1f}%",
+        f"• За месяц: {data['month_games']} игр, {data['month_winrate']:.1f}%",
+        "",
+        "Оценка показателей:",
+        f"• Стабильность: {star_emojis[metrics['consistency']]}",
+        f"• Тренд: {star_emojis[metrics['trend_score']]}",
+        f"• Опыт: {star_emojis[metrics['experience']]}",
+        f"• Текущая форма: {star_emojis[metrics['recent_performance']]}",
+        f"• Общая оценка: {data['total_score']}/{max_score}"
+    ]
+    
+    # ... остальной код без изменений ... 

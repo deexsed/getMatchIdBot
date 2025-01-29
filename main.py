@@ -19,6 +19,7 @@ from handlers.stats import stats_handler, period_stats_handler, handle_period_st
 from handlers.predictions import hero_prediction_handler, handle_hero_prediction
 from handlers.achievements import achievements_handler, achievement_button_handler
 from utils.bot_commands import DEFAULT_COMMANDS
+from utils.hero_import import import_heroes
 
 # Настройка логирования
 logging.basicConfig(
@@ -31,6 +32,9 @@ async def post_init(application):
     """Выполняется после инициализации бота"""
     await application.bot.delete_my_commands()  # Удаляем старые команды
     await application.bot.set_my_commands(DEFAULT_COMMANDS)  # Устанавливаем новые
+    logger.info("Обновление базы героев...")
+    await import_heroes()  # Обновляем героев при каждом запуске бота
+    logger.info("База героев успешно обновлена")
 
 def main():
     # Инициализируем базу данных

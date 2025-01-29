@@ -4,7 +4,7 @@
 import logging
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import CallbackContext
-from services.hero_service import get_user_heroes, HEROES
+from services.hero_service import get_all_heroes, get_user_heroes, HEROES_PER_PAGE
 from services.stats_service import get_last_matches
 from services.match_service import save_match
 from utils.keyboards import (
@@ -16,8 +16,6 @@ from utils.decorators import handle_errors
 import json
 
 logger = logging.getLogger(__name__)
-
-HEROES_PER_PAGE = 21
 
 @handle_errors
 async def new_game(update: Update, context: CallbackContext) -> None:
@@ -32,7 +30,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
     if context.user_data.get('waiting_for_search'):
         search_query = update.message.text.strip()
         context.user_data['waiting_for_search'] = False
-        await send_hero_selection(update, search_query=search_query)
+        await send_hero_selection(update, context, search_query=search_query)
         return
         
     if context.user_data.get('waiting_for_match_id'):
@@ -56,39 +54,44 @@ async def handle_match_id(update: Update, context: CallbackContext) -> None:
     context.user_data['nickname'] = nickname
     context.user_data['waiting_for_match_id'] = False
     
-    keyboard = get_hero_selection_keyboard()
-    await update.message.reply_text("Выберите героя:", reply_markup=keyboard)
+    await send_hero_selection(update, context)
 
-async def send_hero_selection(update: Update, page: int = 1, search_query: str = None) -> None:
+@handle_errors
+async def send_hero_selection(update: Update, context: CallbackContext, page: int = 1, search_query: str = None) -> None:
     """Отправляет страницу с героями"""
     keyboard = []
+    heroes = get_all_heroes()
     
     # Добавляем кнопку поиска в начале
     keyboard.append([InlineKeyboardButton("🔍 Поиск", callback_data="search")])
     
     if search_query:
-        filtered_heroes = [hero for hero in HEROES if search_query.lower() in hero.lower()]
+        filtered_heroes = [
+            hero for hero in heroes 
+            if search_query.lower() in hero['localized_name'].lower()
+        ]
         heroes_to_show = filtered_heroes
     else:
         start_idx = (page - 1) * HEROES_PER_PAGE
         end_idx = start_idx + HEROES_PER_PAGE
-        heroes_to_show = HEROES[start_idx:end_idx]
+        heroes_to_show = heroes[start_idx:end_idx]
 
     # Добавляем кнопки героев по три в ряд
     for i in range(0, len(heroes_to_show), 3):
         row = []
         for j in range(3):
             if i + j < len(heroes_to_show):
+                hero = heroes_to_show[i + j]
                 row.append(InlineKeyboardButton(
-                    heroes_to_show[i + j], 
-                    callback_data=f"hero:{heroes_to_show[i + j]}"
+                    hero['localized_name'], 
+                    callback_data=f"hero:{hero['name']}"
                 ))
         keyboard.append(row)
     
     # Добавляем навигационные кнопки
     if not search_query:
         nav_buttons = []
-        max_pages = len(HEROES) // HEROES_PER_PAGE + (1 if len(HEROES) % HEROES_PER_PAGE > 0 else 0)
+        max_pages = (len(heroes) + HEROES_PER_PAGE - 1) // HEROES_PER_PAGE
         
         if page > 1:
             nav_buttons.append(InlineKeyboardButton("⬅️", callback_data=f"page:{page-1}"))
@@ -111,15 +114,18 @@ async def send_hero_selection(update: Update, page: int = 1, search_query: str =
     else:
         await update.message.reply_text(text, reply_markup=reply_markup)
 
+@handle_errors
 async def handle_hero_selection(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
     
     data = query.data
+    heroes = get_all_heroes()
+    hero_names = [hero['name'] for hero in heroes]
     
     if data.startswith("page:"):
         page = int(data.split(":")[1])
-        await send_hero_selection(update, page=page)
+        await send_hero_selection(update, context, page=page)
         return
     
     if data == "search":
@@ -134,12 +140,12 @@ async def handle_hero_selection(update: Update, context: CallbackContext) -> Non
     
     if data == "cancel_search":
         context.user_data['waiting_for_search'] = False
-        await send_hero_selection(update)
+        await send_hero_selection(update, context)
         return
     
     if data.startswith("hero:"):
         hero_name = data.split(":")[1]
-        if hero_name not in HEROES:
+        if hero_name not in hero_names:
             return
 
         match_id = context.user_data.get('match_id')
